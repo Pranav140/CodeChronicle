@@ -2,7 +2,8 @@
 function calculateTotal(items) {
     let total = 0;
     for (let item of items) {
-        total += item.price;
+        // Add tax calculation
+        total += item.price * 1.1; // 10% tax
     }
     return total;
 }
