@@ -10,6 +10,7 @@ export interface CommitInfo {
     authorEmail: string;
     date: string;
     message: string;
+    body: string;
     diff: string;
     lineStart: number;
     lineEnd: number;
@@ -97,30 +98,64 @@ export class GitService {
             const logCmd = `git log --pretty=format:"%H|%an|%ae|%ai|%s" -L ${startLine},${endLine}:"${relativePath}"`;
             const { stdout } = await execAsync(logCmd, { cwd: workspaceRoot, maxBuffer: 1024 * 1024 * 10 });
 
-            const lines = stdout.trim().split('\n').filter(l => l.includes('|'));
+            // Only keep lines that are actual commit log entries:
+            // format is "%H|%an|%ae|%ai|%s" so line starts with a 40-char hex hash
+            const commitLineRe = /^[0-9a-f]{40}\|/;
+            const lines = stdout.trim().split('\n').filter(l => commitLineRe.test(l));
             const authorContributions = new Map<string, number>();
 
             lines.forEach(line => {
-                const [, author] = line.split('|');
-                authorContributions.set(author, (authorContributions.get(author) || 0) + 1);
+                const parts = line.split('|');
+                const author = parts[1];
+                if (author) {
+                    authorContributions.set(author, (authorContributions.get(author) || 0) + 1);
+                }
             });
 
             const mostActiveAuthor = Array.from(authorContributions.entries())
                 .sort((a, b) => b[1] - a[1])[0]?.[0] || 'Unknown';
 
-            const firstCommitData = lines[lines.length - 1]?.split('|');
-            const lastCommitData = lines[0]?.split('|');
+            const firstCommitLine = lines[lines.length - 1];
+            const lastCommitLine = lines[0];
 
-            const firstDate = firstCommitData ? new Date(firstCommitData[3]) : new Date();
-            const lastDate = lastCommitData ? new Date(lastCommitData[3]) : new Date();
-            const ageInDays = Math.floor((Date.now() - firstDate.getTime()) / (1000 * 60 * 60 * 24));
+            const firstDate = (() => {
+                if (!firstCommitLine) { return new Date(); }
+                const [,,,date] = firstCommitLine.split('|');
+                return date ? new Date(date) : new Date();
+            })();
+            const ageInDays = isNaN(firstDate.getTime()) ? 0 : Math.floor((Date.now() - firstDate.getTime()) / (1000 * 60 * 60 * 24));
             const changeFreq = lines.length > 0 ? Math.floor(ageInDays / lines.length) : 0;
+
+            const makeMinimalCommit = (line: string): CommitInfo | null => {
+                const [hash, author, authorEmail, date, ...subjectParts] = line.split('|');
+                if (!hash || !author) { return null; }
+                const subject = subjectParts.join('|');
+                const commitDate = new Date(date);
+                return {
+                    hash: hash.substring(0, 8),
+                    author,
+                    authorEmail: authorEmail || '',
+                    date: isNaN(commitDate.getTime()) ? '' : commitDate.toLocaleString(),
+                    message: subject || '',
+                    body: '',
+                    diff: '',
+                    lineStart: startLine,
+                    lineEnd: endLine,
+                    filesChanged: 0,
+                    insertions: 0,
+                    deletions: 0,
+                    relativeTime: isNaN(commitDate.getTime()) ? '' : this.getRelativeTime(commitDate)
+                };
+            };
+
+            const firstCommit = firstCommitLine ? makeMinimalCommit(firstCommitLine) : null;
+            const lastCommit  = lastCommitLine  ? makeMinimalCommit(lastCommitLine)  : null;
 
             return {
                 totalCommits: lines.length,
                 totalAuthors: authorContributions.size,
-                firstCommit: null,
-                lastCommit: null,
+                firstCommit,
+                lastCommit,
                 mostActiveAuthor,
                 codeAge: this.formatAge(ageInDays),
                 changeFrequency: changeFreq > 0 ? `Every ${changeFreq} days` : 'Very frequent',
@@ -258,9 +293,21 @@ export class GitService {
         endLine: number
     ): Promise<CommitInfo | null> {
         try {
-            // Get commit metadata with stats
-            const logCmd = `git log -1 --format="%H%n%an%n%ae%n%ai%n%s" --shortstat ${hash}`;
-            const { stdout: logOutput } = await execAsync(logCmd, { cwd: workspaceRoot, maxBuffer: 1024 * 1024 * 10 });
+            // Get commit metadata with stats, body, and diff in parallel
+            const logCmd  = `git log -1 --format="%H%n%an%n%ae%n%ai%n%s" --shortstat ${hash}`;
+            const bodyCmd = `git log -1 --format="%b" ${hash}`;
+            const diffCmd = `git show ${hash} -- "${filePath}"`;
+
+            const [logResult, bodyResult, diffResult] = await Promise.all([
+                execAsync(logCmd,  { cwd: workspaceRoot, maxBuffer: 1024 * 1024 * 10 }),
+                execAsync(bodyCmd, { cwd: workspaceRoot, maxBuffer: 1024 * 1024 }),
+                execAsync(diffCmd, { cwd: workspaceRoot, maxBuffer: 1024 * 1024 * 10 })
+            ]);
+
+            const { stdout: logOutput  } = logResult;
+            const { stdout: bodyOutput } = bodyResult;
+            const { stdout: diffOutput } = diffResult;
+
             const lines = logOutput.trim().split('\n');
             const [commitHash, author, authorEmail, date, message] = lines;
 
@@ -278,10 +325,6 @@ export class GitService {
                 deletions = deleteMatch ? parseInt(deleteMatch[1]) : 0;
             }
 
-            // Get diff for this file
-            const diffCmd = `git show ${hash} -- "${filePath}"`;
-            const { stdout: diffOutput } = await execAsync(diffCmd, { cwd: workspaceRoot, maxBuffer: 1024 * 1024 * 10 });
-
             const commitDate = new Date(date);
 
             return {
@@ -290,6 +333,7 @@ export class GitService {
                 authorEmail,
                 date: commitDate.toLocaleString(),
                 message,
+                body: bodyOutput.trim(),
                 diff: diffOutput,
                 lineStart: startLine,
                 lineEnd: endLine,
