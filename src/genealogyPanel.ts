@@ -64,6 +64,7 @@ export class GenealogyPanel {
         relatedFiles: RelatedFile[],
         insights: CodeInsight
     ): string {
+        const nonce = this._getNonce();
         const fileName = filePath.split(/[\\/]/).pop();
         const authorChartHtml = this._generateAuthorChart(evolution.authorContributions);
         
@@ -71,6 +72,7 @@ export class GenealogyPanel {
 <html lang="en">
 <head>
     <meta charset="UTF-8">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; script-src 'nonce-${nonce}';">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>CodeChronicle</title>
     <style>
@@ -322,9 +324,9 @@ export class GenealogyPanel {
         </div>
 
         <div class="tabs">
-            <button class="tab active" onclick="switchTab('timeline')">📅 Timeline</button>
-            <button class="tab" onclick="switchTab('authors')">👥 Authors</button>
-            <button class="tab" onclick="switchTab('related')">🔗 Related Files</button>
+            <button class="tab active" onclick="switchTab(event, 'timeline')">📅 Timeline</button>
+            <button class="tab" onclick="switchTab(event, 'authors')">👥 Authors</button>
+            <button class="tab" onclick="switchTab(event, 'related')">🔗 Related Files</button>
         </div>
 
         <div id="timeline" class="tab-content active">
@@ -371,7 +373,7 @@ export class GenealogyPanel {
         </div>
     `}
 
-    <script>
+    <script nonce="${nonce}">
         function toggleDiff(index) {
             const diffEl = document.getElementById('diff-' + index);
             const toggleEl = diffEl.previousElementSibling;
@@ -384,7 +386,7 @@ export class GenealogyPanel {
             }
         }
 
-        function switchTab(tabName) {
+        function switchTab(event, tabName) {
             document.querySelectorAll('.tab').forEach(tab => tab.classList.remove('active'));
             document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
             
@@ -435,6 +437,15 @@ export class GenealogyPanel {
             .replace(/>/g, '&gt;')
             .replace(/"/g, '&quot;')
             .replace(/'/g, '&#039;');
+    }
+
+    private _getNonce(): string {
+        let text = '';
+        const possible = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+        for (let i = 0; i < 32; i++) {
+            text += possible.charAt(Math.floor(Math.random() * possible.length));
+        }
+        return text;
     }
 
     public dispose() {

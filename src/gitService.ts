@@ -1,4 +1,4 @@
-import { exec } from 'child_process';
+import { exec, execSync } from 'child_process';
 import { promisify } from 'util';
 import * as path from 'path';
 
@@ -56,11 +56,15 @@ export class GitService {
             // Parse commit hashes from blame
             const commitHashes = this.parseBlameOutput(blameOutput);
 
-            // Get detailed info for each commit
+            // Get detailed info for each commit in parallel
             const commits: CommitInfo[] = [];
-            for (const hash of commitHashes) {
-                const commitInfo = await this.getCommitDetails(workspaceRoot, hash, relativePath, startLine, endLine);
-                if (commitInfo && !commits.find(c => c.hash === commitInfo.hash)) {
+            const commitInfos = await Promise.all(
+                commitHashes.map(hash => this.getCommitDetails(workspaceRoot, hash, relativePath, startLine, endLine))
+            );
+            const seen = new Set<string>();
+            for (const commitInfo of commitInfos) {
+                if (commitInfo && !seen.has(commitInfo.hash)) {
+                    seen.add(commitInfo.hash);
                     commits.push(commitInfo);
                 }
             }
@@ -72,20 +76,16 @@ export class GitService {
     }
 
     private getGitRoot(filePath: string): string {
-        let dir = path.dirname(filePath);
-        while (dir !== path.dirname(dir)) {
-            try {
-                const { stdout } = require('child_process').execSync('git rev-parse --show-toplevel', { 
-                    cwd: dir, 
-                    encoding: 'utf8',
-                    stdio: ['pipe', 'pipe', 'ignore']
-                });
-                return stdout.trim().replace(/\\/g, '/');
-            } catch {
-                dir = path.dirname(dir);
-            }
+        try {
+            const result = execSync('git rev-parse --show-toplevel', {
+                cwd: path.dirname(filePath),
+                encoding: 'utf8',
+                stdio: ['pipe', 'pipe', 'ignore']
+            }) as string;
+            return result.trim().replace(/\\/g, '/');
+        } catch {
+            return path.dirname(filePath);
         }
-        return path.dirname(filePath);
     }
 
     async getCodeEvolution(filePath: string, startLine: number, endLine: number): Promise<CodeEvolution> {

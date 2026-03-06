@@ -23,7 +23,7 @@ export function activate(context: vscode.ExtensionContext) {
         const endLine = selection.end.line + 1;
 
         try {
-            vscode.window.withProgress({
+            await vscode.window.withProgress({
                 location: vscode.ProgressLocation.Notification,
                 title: "Analyzing code history...",
                 cancellable: false
