@@ -1,0 +1,41 @@
+{
+  "name": "code-chronicle",
+  "displayName": "CodeChronicle",
+  "description": "Trace the complete history of any code snippet - who wrote it, when, why, and how it evolved",
+  "version": "0.0.1",
+  "engines": {
+    "vscode": "^1.80.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "main": "./out/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "code-chronicle.showChronicle",
+        "title": "Show CodeChronicle"
+      }
+    ],
+    "menus": {
+      "editor/context": [
+        {
+          "command": "code-chronicle.showChronicle",
+          "group": "navigation",
+          "when": "editorHasSelection"
+        }
+      ]
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "pretest": "npm run compile"
+  },
+  "devDependencies": {
+    "@types/node": "^18.x",
+    "@types/vscode": "^1.80.0",
+    "typescript": "^5.0.0"
+  }
+}
