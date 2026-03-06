@@ -1,4 +1,5 @@
 import * as vscode from 'vscode';
+import * as crypto from 'crypto';
 import { CommitInfo, CodeEvolution, RelatedFile, CodeInsight } from './gitService';
 
 export class GenealogyPanel {
@@ -88,7 +89,7 @@ export class GenealogyPanel {
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; script-src 'nonce-${nonce}'; connect-src https://github.com;">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; script-src 'nonce-${nonce}'; img-src https://www.gravatar.com data:; connect-src https://github.com;">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>CodeChronicle</title>
     <style>
@@ -334,10 +335,23 @@ export class GenealogyPanel {
         .avatar {
             width: 34px; height: 34px;
             border-radius: 50%;
+            flex-shrink: 0;
+            position: relative;
+            overflow: hidden;
+            background: linear-gradient(135deg, var(--accent), var(--purple));
+        }
+        .avatar-img {
+            position: absolute;
+            inset: 0;
+            width: 100%; height: 100%;
+            object-fit: cover;
+            border-radius: 50%;
+        }
+        .avatar-label {
+            position: absolute;
+            inset: 0;
             display: flex; align-items: center; justify-content: center;
             font-weight: 700; font-size: 12px;
-            flex-shrink: 0;
-            background: linear-gradient(135deg, var(--accent), var(--purple));
             color: #ffffff;
             text-transform: uppercase;
             letter-spacing: .5px;
@@ -567,12 +581,10 @@ export class GenealogyPanel {
         .author-avatar {
             width: 36px; height: 36px;
             border-radius: 50%;
-            display: flex; align-items: center; justify-content: center;
-            font-weight: 700; font-size: 13px;
             flex-shrink: 0;
+            position: relative;
+            overflow: hidden;
             background: linear-gradient(135deg, var(--accent), var(--purple));
-            color: #ffffff;
-            text-transform: uppercase;
         }
         .author-info { flex: 1; min-width: 0; }
         .author-name-link {
@@ -810,11 +822,15 @@ export class GenealogyPanel {
                 ${history.map((commit) => {
                     const initials = commit.author.split(' ').map((w: string) => w[0]).join('').substring(0, 2);
                     const ghUrl = 'https://github.com/' + encodeURIComponent(commit.author.replace(/ /g, ''));
+                    const gravatarUrl = commit.authorEmail ? this._gravatarUrl(commit.authorEmail) : '';
                     return `
                     <div class="commit">
                         <div class="commit-dot"></div>
                         <div class="commit-top">
-                            <div class="avatar">${this._escapeHtml(initials)}</div>
+                            <div class="avatar">
+                                ${gravatarUrl ? `<img class="avatar-img" src="${gravatarUrl}" alt="">` : ''}
+                                <span class="avatar-label">${this._escapeHtml(initials)}</span>
+                            </div>
                             <div class="commit-meta">
                                 <div class="commit-message" title="${this._escapeHtml(commit.message)}">${this._escapeHtml(commit.message)}</div>
                                 ${commit.body ? `<span class="commit-body-toggle">💬 See full reason ▾</span><div class="commit-body">${this._escapeHtml(commit.body)}</div>` : ''}
@@ -935,6 +951,11 @@ export class GenealogyPanel {
             });
         });
 
+        // ── Avatar image error fallback (show initials if Gravatar fails) ──
+        document.querySelectorAll('.avatar-img').forEach(function(img) {
+            img.addEventListener('error', function() { this.style.display = 'none'; });
+        });
+
         // ── Commit hash copy on click ──
         document.querySelectorAll('.commit-hash').forEach(function(el) {
             el.title = 'Click to copy hash';
@@ -962,10 +983,15 @@ export class GenealogyPanel {
             const initials = author.split(' ').map((w: string) => w[0]).join('').substring(0, 2);
             const ghUrl = 'https://github.com/' + encodeURIComponent(author.replace(/ /g, ''));
             const rankLabel = idx === 0 ? '🥇' : idx === 1 ? '🥈' : idx === 2 ? '🥉' : `#${idx + 1}`;
+            const email = emailMap.get(author) || '';
+            const gravatarUrl = email ? this._gravatarUrl(email) : '';
             return `
                 <div class="author-row">
                     <div class="author-rank">${rankLabel}</div>
-                    <div class="author-avatar">${this._escapeHtml(initials)}</div>
+                    <div class="author-avatar">
+                        ${gravatarUrl ? `<img class="avatar-img" src="${gravatarUrl}" alt="">` : ''}
+                        <span class="avatar-label">${this._escapeHtml(initials)}</span>
+                    </div>
                     <div class="author-info">
                         <a class="author-name-link" href="${ghUrl}" title="Open ${this._escapeHtml(author)} on GitHub">${this._escapeHtml(author)}</a>
                         <div class="author-bar-track">
@@ -1059,6 +1085,11 @@ export class GenealogyPanel {
             </div>
             <div class="diff-pane active" data-pane="relevant">${relevantHtml}</div>
             <div class="diff-pane" data-pane="full">${fullHtml}</div>`;
+    }
+
+    private _gravatarUrl(email: string): string {
+        const hash = crypto.createHash('md5').update(email.toLowerCase().trim()).digest('hex');
+        return `https://www.gravatar.com/avatar/${hash}?s=68&d=404`;
     }
 
     private _escapeHtml(text: string): string {
