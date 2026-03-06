@@ -33,11 +33,38 @@ Trace the complete history of any code snippet - WHO wrote it, WHEN, WHY, and ho
 - **Total Commits**: Complete modification count
 - **Hotspot Detection**: Identifies problematic areas
 
-## Usage
+## 🚀 Installation
 
-1. Select any lines of code in your editor
-2. Right-click and choose "Show Code Genealogy"
-3. View the complete history in an interactive panel
+### For Users (Easiest Way)
+
+**Download and Install:**
+1. Go to [Releases](https://github.com/Pranav140/CodeChronicle/releases)
+2. Download `code-chronicle-0.0.1.vsix`
+3. In VS Code: Press `Ctrl+Shift+P` (or `Cmd+Shift+P` on Mac)
+4. Type "Extensions: Install from VSIX"
+5. Select the downloaded file
+6. Reload VS Code
+
+**Or via Command Line:**
+```bash
+code --install-extension code-chronicle-0.0.1.vsix
+```
+
+### For Developers
+
+```bash
+git clone https://github.com/Pranav140/CodeChronicle.git
+cd CodeChronicle
+npm install
+npm run compile
+# Press F5 in VS Code to test
+```
+
+## 📖 Usage
+
+1. Open any file in a Git repository
+2. Select the lines of code you want to analyze
+3. Right-click and choose "Show CodeChronicle"
 
 ## Requirements
 
