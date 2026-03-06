@@ -9,6 +9,10 @@ function calculateTotal(items) {
 }
 
 function applyDiscount(total, discountPercent) {
+    // Validate discount percentage
+    if (discountPercent < 0 || discountPercent > 100) {
+        throw new Error('Invalid discount percentage');
+    }
     return total - (total * discountPercent / 100);
 }
 
