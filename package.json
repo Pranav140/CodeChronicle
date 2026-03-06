@@ -3,6 +3,18 @@
   "displayName": "CodeChronicle",
   "description": "Trace the complete history of any code snippet - who wrote it, when, why, and how it evolved",
   "version": "0.0.1",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Pranav140/CodeChronicle.git"
+  },
+  "keywords": [
+    "git",
+    "history",
+    "blame",
+    "timeline",
+    "code-analysis",
+    "ai-insights"
+  ],
   "engines": {
     "vscode": "^1.80.0"
   },
